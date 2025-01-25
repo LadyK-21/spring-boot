@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2023-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Andy Wilkinson
  */
-public class DependencyVersionUpgradeTests {
+class DependencyVersionUpgradeTests {
 
 	@ParameterizedTest
 	@ArtifactVersion(current = "1.2.3", candidate = "1.2.3")
@@ -244,7 +244,7 @@ public class DependencyVersionUpgradeTests {
 	static class InputProvider implements ArgumentsProvider {
 
 		@Override
-		public Stream<? extends Arguments> provideArguments(ExtensionContext context) throws Exception {
+		public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
 			Method testMethod = context.getRequiredTestMethod();
 			Stream<Arguments> artifactVersions = artifactVersions(testMethod)
 				.map((artifactVersion) -> Arguments.of(VersionType.ARTIFACT_VERSION.parse(artifactVersion.current()),

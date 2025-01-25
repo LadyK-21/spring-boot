@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,14 +25,12 @@ import oracle.jdbc.OracleConnection;
 import oracle.ucp.jdbc.PoolDataSourceImpl;
 
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnCheckpointRestore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.boot.jdbc.DatabaseDriver;
-import org.springframework.boot.jdbc.HikariCheckpointRestoreLifecycle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
@@ -79,7 +77,7 @@ abstract class DataSourceConfiguration {
 		}
 
 		@Bean
-		@ConfigurationProperties(prefix = "spring.datasource.tomcat")
+		@ConfigurationProperties("spring.datasource.tomcat")
 		org.apache.tomcat.jdbc.pool.DataSource dataSource(DataSourceProperties properties,
 				JdbcConnectionDetails connectionDetails) {
 			Class<? extends DataSource> dataSourceType = org.apache.tomcat.jdbc.pool.DataSource.class;
@@ -114,7 +112,7 @@ abstract class DataSourceConfiguration {
 		}
 
 		@Bean
-		@ConfigurationProperties(prefix = "spring.datasource.hikari")
+		@ConfigurationProperties("spring.datasource.hikari")
 		HikariDataSource dataSource(DataSourceProperties properties, JdbcConnectionDetails connectionDetails) {
 			HikariDataSource dataSource = createDataSource(connectionDetails, HikariDataSource.class,
 					properties.getClassLoader());
@@ -122,12 +120,6 @@ abstract class DataSourceConfiguration {
 				dataSource.setPoolName(properties.getName());
 			}
 			return dataSource;
-		}
-
-		@Bean
-		@ConditionalOnCheckpointRestore
-		HikariCheckpointRestoreLifecycle hikariCheckpointRestoreLifecycle(HikariDataSource hikariDataSource) {
-			return new HikariCheckpointRestoreLifecycle(hikariDataSource);
 		}
 
 	}
@@ -149,7 +141,7 @@ abstract class DataSourceConfiguration {
 		}
 
 		@Bean
-		@ConfigurationProperties(prefix = "spring.datasource.dbcp2")
+		@ConfigurationProperties("spring.datasource.dbcp2")
 		org.apache.commons.dbcp2.BasicDataSource dataSource(DataSourceProperties properties,
 				JdbcConnectionDetails connectionDetails) {
 			Class<? extends DataSource> dataSourceType = org.apache.commons.dbcp2.BasicDataSource.class;
@@ -175,12 +167,11 @@ abstract class DataSourceConfiguration {
 		}
 
 		@Bean
-		@ConfigurationProperties(prefix = "spring.datasource.oracleucp")
+		@ConfigurationProperties("spring.datasource.oracleucp")
 		PoolDataSourceImpl dataSource(DataSourceProperties properties, JdbcConnectionDetails connectionDetails)
 				throws SQLException {
 			PoolDataSourceImpl dataSource = createDataSource(connectionDetails, PoolDataSourceImpl.class,
 					properties.getClassLoader());
-			dataSource.setValidateConnectionOnBorrow(true);
 			if (StringUtils.hasText(properties.getName())) {
 				dataSource.setConnectionPoolName(properties.getName());
 			}

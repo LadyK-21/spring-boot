@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.buffer.NettyDataBufferFactory;
-import org.springframework.http.client.reactive.ReactorResourceFactory;
+import org.springframework.http.client.ReactorResourceFactory;
 import org.springframework.messaging.rsocket.RSocketStrategies;
 import org.springframework.messaging.rsocket.annotation.support.RSocketMessageHandler;
 import org.springframework.util.unit.DataSize;
@@ -94,7 +94,7 @@ public class RSocketServerAutoConfiguration {
 
 	}
 
-	@ConditionalOnProperty(prefix = "spring.rsocket.server", name = "port")
+	@ConditionalOnProperty("spring.rsocket.server.port")
 	@ConditionalOnClass(ReactorResourceFactory.class)
 	@Configuration(proxyBeanMethods = false)
 	@Import(ReactorNettyConfigurations.ReactorResourceFactoryConfiguration.class)
@@ -147,17 +147,17 @@ public class RSocketServerAutoConfiguration {
 
 		}
 
-		@ConditionalOnProperty(prefix = "spring.rsocket.server", name = "port", matchIfMissing = true)
+		@ConditionalOnProperty(name = "spring.rsocket.server.port", matchIfMissing = true)
 		static class HasNoPortConfigured {
 
 		}
 
-		@ConditionalOnProperty(prefix = "spring.rsocket.server", name = "mapping-path")
+		@ConditionalOnProperty("spring.rsocket.server.mapping-path")
 		static class HasMappingPathConfigured {
 
 		}
 
-		@ConditionalOnProperty(prefix = "spring.rsocket.server", name = "transport", havingValue = "websocket")
+		@ConditionalOnProperty(name = "spring.rsocket.server.transport", havingValue = "websocket")
 		static class HasWebsocketTransportConfigured {
 
 		}

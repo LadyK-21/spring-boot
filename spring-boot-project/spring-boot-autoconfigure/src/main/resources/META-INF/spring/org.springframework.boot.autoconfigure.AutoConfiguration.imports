@@ -62,8 +62,8 @@ org.springframework.boot.autoconfigure.hateoas.HypermediaAutoConfiguration
 org.springframework.boot.autoconfigure.hazelcast.HazelcastAutoConfiguration
 org.springframework.boot.autoconfigure.hazelcast.HazelcastJpaDependencyAutoConfiguration
 org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration
+org.springframework.boot.autoconfigure.http.client.HttpClientAutoConfiguration
 org.springframework.boot.autoconfigure.http.codec.CodecsAutoConfiguration
-org.springframework.boot.autoconfigure.influx.InfluxDbAutoConfiguration
 org.springframework.boot.autoconfigure.info.ProjectInfoAutoConfiguration
 org.springframework.boot.autoconfigure.integration.IntegrationAutoConfiguration
 org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration
@@ -98,7 +98,9 @@ org.springframework.boot.autoconfigure.pulsar.PulsarAutoConfiguration
 org.springframework.boot.autoconfigure.pulsar.PulsarReactiveAutoConfiguration
 org.springframework.boot.autoconfigure.quartz.QuartzAutoConfiguration
 org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration
+org.springframework.boot.autoconfigure.r2dbc.R2dbcProxyAutoConfiguration
 org.springframework.boot.autoconfigure.r2dbc.R2dbcTransactionManagerAutoConfiguration
+org.springframework.boot.autoconfigure.reactor.ReactorAutoConfiguration
 org.springframework.boot.autoconfigure.rsocket.RSocketMessagingAutoConfiguration
 org.springframework.boot.autoconfigure.rsocket.RSocketRequesterAutoConfiguration
 org.springframework.boot.autoconfigure.rsocket.RSocketServerAutoConfiguration
@@ -124,6 +126,7 @@ org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration
 org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration
 org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration
 org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration
+org.springframework.boot.autoconfigure.transaction.TransactionManagerCustomizationAutoConfiguration
 org.springframework.boot.autoconfigure.transaction.jta.JtaAutoConfiguration
 org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration
 org.springframework.boot.autoconfigure.web.client.RestClientAutoConfiguration

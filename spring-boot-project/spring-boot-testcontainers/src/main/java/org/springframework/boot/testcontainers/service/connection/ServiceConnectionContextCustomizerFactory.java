@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import java.util.List;
 import org.testcontainers.containers.Container;
 
 import org.springframework.boot.origin.Origin;
+import org.springframework.context.aot.AbstractAotProcessor;
 import org.springframework.core.annotation.MergedAnnotation;
 import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.test.context.ContextConfigurationAttributes;
@@ -41,6 +42,7 @@ import org.springframework.util.ReflectionUtils;
  * @author Moritz Halbritter
  * @author Andy Wilkinson
  * @author Phillip Webb
+ * @author Scott Frederick
  */
 class ServiceConnectionContextCustomizerFactory implements ContextCustomizerFactory {
 
@@ -48,19 +50,26 @@ class ServiceConnectionContextCustomizerFactory implements ContextCustomizerFact
 	public ContextCustomizer createContextCustomizer(Class<?> testClass,
 			List<ContextConfigurationAttributes> configAttributes) {
 		List<ContainerConnectionSource<?>> sources = new ArrayList<>();
-		findSources(testClass, sources);
+		collectSources(testClass, sources);
 		return new ServiceConnectionContextCustomizer(sources);
 	}
 
-	private void findSources(Class<?> clazz, List<ContainerConnectionSource<?>> sources) {
-		ReflectionUtils.doWithFields(clazz, (field) -> {
+	private void collectSources(Class<?> candidate, List<ContainerConnectionSource<?>> sources) {
+		if (candidate == Object.class || candidate == null) {
+			return;
+		}
+		ReflectionUtils.doWithLocalFields(candidate, (field) -> {
 			MergedAnnotations annotations = MergedAnnotations.from(field);
 			annotations.stream(ServiceConnection.class)
 				.forEach((annotation) -> sources.add(createSource(field, annotation)));
 		});
-		if (TestContextAnnotationUtils.searchEnclosingClass(clazz)) {
-			findSources(clazz.getEnclosingClass(), sources);
+		if (TestContextAnnotationUtils.searchEnclosingClass(candidate)) {
+			collectSources(candidate.getEnclosingClass(), sources);
 		}
+		for (Class<?> implementedInterface : candidate.getInterfaces()) {
+			collectSources(implementedInterface, sources);
+		}
+		collectSources(candidate.getSuperclass(), sources);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -88,7 +97,7 @@ class ServiceConnectionContextCustomizerFactory implements ContextCustomizerFact
 	}
 
 	private boolean isAotProcessingInProgress() {
-		return Boolean.getBoolean("spring.aot.processing");
+		return Boolean.getBoolean(AbstractAotProcessor.AOT_PROCESSING);
 	}
 
 }

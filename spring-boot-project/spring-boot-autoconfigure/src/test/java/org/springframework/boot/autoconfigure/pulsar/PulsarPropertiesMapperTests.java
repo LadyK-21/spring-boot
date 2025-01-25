@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.apache.pulsar.client.admin.PulsarAdminBuilder;
+import org.apache.pulsar.client.api.AutoClusterFailoverBuilder.FailoverPolicy;
 import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.CompressionType;
 import org.apache.pulsar.client.api.ConsumerBuilder;
@@ -34,22 +35,31 @@ import org.apache.pulsar.client.api.ProducerBuilder;
 import org.apache.pulsar.client.api.PulsarClientException.UnsupportedAuthenticationException;
 import org.apache.pulsar.client.api.ReaderBuilder;
 import org.apache.pulsar.client.api.SubscriptionType;
+import org.apache.pulsar.client.impl.AutoClusterFailover;
 import org.apache.pulsar.common.schema.SchemaType;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.pulsar.PulsarProperties.Consumer;
+import org.springframework.boot.autoconfigure.pulsar.PulsarProperties.Failover.BackupCluster;
+import org.springframework.pulsar.core.PulsarProducerFactory;
+import org.springframework.pulsar.core.PulsarTemplate;
 import org.springframework.pulsar.listener.PulsarContainerProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 /**
  * Tests for {@link PulsarPropertiesMapper}.
  *
  * @author Chris Bono
  * @author Phillip Webb
+ * @author Swamy Mavuri
+ * @author Vedran Pavic
  */
 class PulsarPropertiesMapperTests {
 
@@ -60,6 +70,8 @@ class PulsarPropertiesMapperTests {
 		properties.getClient().setConnectionTimeout(Duration.ofSeconds(1));
 		properties.getClient().setOperationTimeout(Duration.ofSeconds(2));
 		properties.getClient().setLookupTimeout(Duration.ofSeconds(3));
+		properties.getClient().getThreads().setIo(3);
+		properties.getClient().getThreads().setListener(10);
 		ClientBuilder builder = mock(ClientBuilder.class);
 		new PulsarPropertiesMapper(properties).customizeClientBuilder(builder,
 				new PropertiesPulsarConnectionDetails(properties));
@@ -67,18 +79,43 @@ class PulsarPropertiesMapperTests {
 		then(builder).should().connectionTimeout(1000, TimeUnit.MILLISECONDS);
 		then(builder).should().operationTimeout(2000, TimeUnit.MILLISECONDS);
 		then(builder).should().lookupTimeout(3000, TimeUnit.MILLISECONDS);
+		then(builder).should().ioThreads(3);
+		then(builder).should().listenerThreads(10);
 	}
 
 	@Test
 	void customizeClientBuilderWhenHasAuthentication() throws UnsupportedAuthenticationException {
 		PulsarProperties properties = new PulsarProperties();
-		Map<String, String> params = Map.of("param", "name");
+		Map<String, String> params = Map.of("simpleParam", "foo", "complexParam",
+				"{\n\t\"k1\" : \"v1\",\n\t\"k2\":\"v2\"\n}");
+		String authParamString = "{\"complexParam\":\"{\\n\\t\\\"k1\\\" : \\\"v1\\\",\\n\\t\\\"k2\\\":\\\"v2\\\"\\n}\""
+				+ ",\"simpleParam\":\"foo\"}";
 		properties.getClient().getAuthentication().setPluginClassName("myclass");
 		properties.getClient().getAuthentication().setParam(params);
 		ClientBuilder builder = mock(ClientBuilder.class);
 		new PulsarPropertiesMapper(properties).customizeClientBuilder(builder,
 				new PropertiesPulsarConnectionDetails(properties));
-		then(builder).should().authentication("myclass", params);
+		then(builder).should().authentication("myclass", authParamString);
+	}
+
+	@Test
+	void customizeClientBuilderWhenTransactionEnabled() {
+		PulsarProperties properties = new PulsarProperties();
+		properties.getTransaction().setEnabled(true);
+		ClientBuilder builder = mock(ClientBuilder.class);
+		new PulsarPropertiesMapper(properties).customizeClientBuilder(builder,
+				new PropertiesPulsarConnectionDetails(properties));
+		then(builder).should().enableTransaction(true);
+	}
+
+	@Test
+	void customizeClientBuilderWhenTransactionDisabled() {
+		PulsarProperties properties = new PulsarProperties();
+		properties.getTransaction().setEnabled(false);
+		ClientBuilder builder = mock(ClientBuilder.class);
+		new PulsarPropertiesMapper(properties).customizeClientBuilder(builder,
+				new PropertiesPulsarConnectionDetails(properties));
+		then(builder).should(never()).enableTransaction(anyBoolean());
 	}
 
 	@Test
@@ -90,6 +127,31 @@ class PulsarPropertiesMapperTests {
 		given(connectionDetails.getBrokerUrl()).willReturn("https://used.example.com");
 		new PulsarPropertiesMapper(properties).customizeClientBuilder(builder, connectionDetails);
 		then(builder).should().serviceUrl("https://used.example.com");
+	}
+
+	@Test
+	void customizeClientBuilderWhenHasFailover() {
+		BackupCluster backupCluster1 = new BackupCluster();
+		backupCluster1.setServiceUrl("backup-cluster-1");
+		Map<String, String> params = Map.of("param", "name");
+		backupCluster1.getAuthentication()
+			.setPluginClassName("org.springframework.boot.autoconfigure.pulsar.MockAuthentication");
+		backupCluster1.getAuthentication().setParam(params);
+		BackupCluster backupCluster2 = new BackupCluster();
+		backupCluster2.setServiceUrl("backup-cluster-2");
+		PulsarProperties properties = new PulsarProperties();
+		properties.getClient().setServiceUrl("https://used.example.com");
+		properties.getClient().getFailover().setPolicy(FailoverPolicy.ORDER);
+		properties.getClient().getFailover().setCheckInterval(Duration.ofSeconds(5));
+		properties.getClient().getFailover().setDelay(Duration.ofSeconds(30));
+		properties.getClient().getFailover().setSwitchBackDelay(Duration.ofSeconds(30));
+		properties.getClient().getFailover().setBackupClusters(List.of(backupCluster1, backupCluster2));
+		PulsarConnectionDetails connectionDetails = mock(PulsarConnectionDetails.class);
+		given(connectionDetails.getBrokerUrl()).willReturn("https://used.example.com");
+		ClientBuilder builder = mock(ClientBuilder.class);
+		new PulsarPropertiesMapper(properties).customizeClientBuilder(builder,
+				new PropertiesPulsarConnectionDetails(properties));
+		then(builder).should().serviceUrlProvider(any(AutoClusterFailover.class));
 	}
 
 	@Test
@@ -111,13 +173,16 @@ class PulsarPropertiesMapperTests {
 	@Test
 	void customizeAdminBuilderWhenHasAuthentication() throws UnsupportedAuthenticationException {
 		PulsarProperties properties = new PulsarProperties();
-		Map<String, String> params = Map.of("param", "name");
+		Map<String, String> params = Map.of("simpleParam", "foo", "complexParam",
+				"{\n\t\"k1\" : \"v1\",\n\t\"k2\":\"v2\"\n}");
+		String authParamString = "{\"complexParam\":\"{\\n\\t\\\"k1\\\" : \\\"v1\\\",\\n\\t\\\"k2\\\":\\\"v2\\\"\\n}\""
+				+ ",\"simpleParam\":\"foo\"}";
 		properties.getAdmin().getAuthentication().setPluginClassName("myclass");
 		properties.getAdmin().getAuthentication().setParam(params);
 		PulsarAdminBuilder builder = mock(PulsarAdminBuilder.class);
 		new PulsarPropertiesMapper(properties).customizeAdminBuilder(builder,
 				new PropertiesPulsarConnectionDetails(properties));
-		then(builder).should().authentication("myclass", params);
+		then(builder).should().authentication("myclass", authParamString);
 	}
 
 	@Test
@@ -159,6 +224,16 @@ class PulsarPropertiesMapperTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
+	void customizeTemplate() {
+		PulsarProperties properties = new PulsarProperties();
+		properties.getTransaction().setEnabled(true);
+		PulsarTemplate<Object> template = new PulsarTemplate<>(mock(PulsarProducerFactory.class));
+		new PulsarPropertiesMapper(properties).customizeTemplate(template);
+		assertThat(template.transactions().isEnabled()).isTrue();
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
 	void customizeConsumerBuilder() {
 		PulsarProperties properties = new PulsarProperties();
 		List<String> topics = List.of("mytopic");
@@ -186,13 +261,19 @@ class PulsarPropertiesMapperTests {
 	void customizeContainerProperties() {
 		PulsarProperties properties = new PulsarProperties();
 		properties.getConsumer().getSubscription().setType(SubscriptionType.Shared);
+		properties.getConsumer().getSubscription().setName("my-subscription");
 		properties.getListener().setSchemaType(SchemaType.AVRO);
-		properties.getListener().setObservationEnabled(false);
+		properties.getListener().setConcurrency(10);
+		properties.getListener().setObservationEnabled(true);
+		properties.getTransaction().setEnabled(true);
 		PulsarContainerProperties containerProperties = new PulsarContainerProperties("my-topic-pattern");
 		new PulsarPropertiesMapper(properties).customizeContainerProperties(containerProperties);
 		assertThat(containerProperties.getSubscriptionType()).isEqualTo(SubscriptionType.Shared);
+		assertThat(containerProperties.getSubscriptionName()).isEqualTo("my-subscription");
 		assertThat(containerProperties.getSchemaType()).isEqualTo(SchemaType.AVRO);
-		assertThat(containerProperties.isObservationEnabled()).isFalse();
+		assertThat(containerProperties.getConcurrency()).isEqualTo(10);
+		assertThat(containerProperties.isObservationEnabled()).isTrue();
+		assertThat(containerProperties.transactions().isEnabled()).isTrue();
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration;
+import org.springframework.boot.autoconfigure.http.client.HttpClientAutoConfiguration;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.boot.web.client.RestTemplateCustomizer;
 import org.springframework.boot.web.client.RestTemplateRequestCustomizer;
@@ -32,25 +35,29 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * {@link EnableAutoConfiguration Auto-configuration} for {@link RestTemplate}.
+ * {@link EnableAutoConfiguration Auto-configuration} for {@link RestTemplate} (via
+ * {@link RestTemplateBuilder}).
  *
  * @author Stephane Nicoll
  * @author Phillip Webb
  * @since 1.4.0
  */
-@AutoConfiguration(after = HttpMessageConvertersAutoConfiguration.class)
+@AutoConfiguration(after = { HttpClientAutoConfiguration.class, HttpMessageConvertersAutoConfiguration.class })
 @ConditionalOnClass(RestTemplate.class)
 @Conditional(NotReactiveWebApplicationCondition.class)
 public class RestTemplateAutoConfiguration {
 
 	@Bean
 	@Lazy
-	@ConditionalOnMissingBean
 	public RestTemplateBuilderConfigurer restTemplateBuilderConfigurer(
+			ObjectProvider<ClientHttpRequestFactoryBuilder<?>> clientHttpRequestFactoryBuilder,
+			ObjectProvider<ClientHttpRequestFactorySettings> clientHttpRequestFactorySettings,
 			ObjectProvider<HttpMessageConverters> messageConverters,
 			ObjectProvider<RestTemplateCustomizer> restTemplateCustomizers,
 			ObjectProvider<RestTemplateRequestCustomizer<?>> restTemplateRequestCustomizers) {
 		RestTemplateBuilderConfigurer configurer = new RestTemplateBuilderConfigurer();
+		configurer.setRequestFactoryBuilder(clientHttpRequestFactoryBuilder.getIfAvailable());
+		configurer.setRequestFactorySettings(clientHttpRequestFactorySettings.getIfAvailable());
 		configurer.setHttpMessageConverters(messageConverters.getIfUnique());
 		configurer.setRestTemplateCustomizers(restTemplateCustomizers.orderedStream().toList());
 		configurer.setRestTemplateRequestCustomizers(restTemplateRequestCustomizers.orderedStream().toList());
@@ -61,8 +68,7 @@ public class RestTemplateAutoConfiguration {
 	@Lazy
 	@ConditionalOnMissingBean
 	public RestTemplateBuilder restTemplateBuilder(RestTemplateBuilderConfigurer restTemplateBuilderConfigurer) {
-		RestTemplateBuilder builder = new RestTemplateBuilder();
-		return restTemplateBuilderConfigurer.configure(builder);
+		return restTemplateBuilderConfigurer.configure(new RestTemplateBuilder());
 	}
 
 }
