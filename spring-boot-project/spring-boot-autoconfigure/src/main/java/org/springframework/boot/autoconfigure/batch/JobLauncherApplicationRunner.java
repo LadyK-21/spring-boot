@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package org.springframework.boot.autoconfigure.batch;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -103,9 +102,9 @@ public class JobLauncherApplicationRunner
 	 * when running a job
 	 */
 	public JobLauncherApplicationRunner(JobLauncher jobLauncher, JobExplorer jobExplorer, JobRepository jobRepository) {
-		Assert.notNull(jobLauncher, "JobLauncher must not be null");
-		Assert.notNull(jobExplorer, "JobExplorer must not be null");
-		Assert.notNull(jobRepository, "JobRepository must not be null");
+		Assert.notNull(jobLauncher, "'jobLauncher' must not be null");
+		Assert.notNull(jobExplorer, "'jobExplorer' must not be null");
+		Assert.notNull(jobRepository, "'jobRepository' must not be null");
 		this.jobLauncher = jobLauncher;
 		this.jobExplorer = jobExplorer;
 		this.jobRepository = jobRepository;
@@ -113,10 +112,10 @@ public class JobLauncherApplicationRunner
 
 	@Override
 	public void afterPropertiesSet() {
-		Assert.isTrue(this.jobs.size() <= 1 || StringUtils.hasText(this.jobName),
+		Assert.state(this.jobs.size() <= 1 || StringUtils.hasText(this.jobName),
 				"Job name must be specified in case of multiple jobs");
 		if (StringUtils.hasText(this.jobName)) {
-			Assert.isTrue(isLocalJob(this.jobName) || isRegisteredJob(this.jobName),
+			Assert.state(isLocalJob(this.jobName) || isRegisteredJob(this.jobName),
 					() -> "No job found with name '" + this.jobName + "'");
 		}
 	}
@@ -230,7 +229,8 @@ public class JobLauncherApplicationRunner
 	private JobParameters getNextJobParametersForExisting(Job job, JobParameters jobParameters) {
 		JobExecution lastExecution = this.jobRepository.getLastJobExecution(job.getName(), jobParameters);
 		if (isStoppedOrFailed(lastExecution) && job.isRestartable()) {
-			JobParameters previousIdentifyingParameters = getGetIdentifying(lastExecution.getJobParameters());
+			JobParameters previousIdentifyingParameters = new JobParameters(
+					lastExecution.getJobParameters().getIdentifyingParameters());
 			return merge(previousIdentifyingParameters, jobParameters);
 		}
 		return jobParameters;
@@ -239,16 +239,6 @@ public class JobLauncherApplicationRunner
 	private boolean isStoppedOrFailed(JobExecution execution) {
 		BatchStatus status = (execution != null) ? execution.getStatus() : null;
 		return (status == BatchStatus.STOPPED || status == BatchStatus.FAILED);
-	}
-
-	private JobParameters getGetIdentifying(JobParameters parameters) {
-		HashMap<String, JobParameter<?>> nonIdentifying = new LinkedHashMap<>(parameters.getParameters().size());
-		parameters.getParameters().forEach((key, value) -> {
-			if (value.isIdentifying()) {
-				nonIdentifying.put(key, value);
-			}
-		});
-		return new JobParameters(nonIdentifying);
 	}
 
 	private JobParameters merge(JobParameters parameters, JobParameters additionals) {

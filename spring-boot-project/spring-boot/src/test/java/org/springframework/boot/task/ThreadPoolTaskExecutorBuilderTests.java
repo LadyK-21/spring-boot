@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import static org.mockito.Mockito.spy;
  *
  * @author Stephane Nicoll
  * @author Filip Hrisafov
+ * @author Yanming Zhou
  */
 class ThreadPoolTaskExecutorBuilderTests {
 
@@ -54,6 +55,12 @@ class ThreadPoolTaskExecutorBuilderTests {
 		assertThat(executor.getMaxPoolSize()).isEqualTo(8);
 		assertThat(executor).hasFieldOrPropertyWithValue("allowCoreThreadTimeOut", true);
 		assertThat(executor.getKeepAliveSeconds()).isEqualTo(60);
+	}
+
+	@Test
+	void acceptTasksAfterContextCloseShouldApply() {
+		ThreadPoolTaskExecutor executor = this.builder.acceptTasksAfterContextClose(true).build();
+		assertThat(executor).hasFieldOrPropertyWithValue("acceptTasksAfterContextClose", true);
 	}
 
 	@Test
@@ -86,14 +93,14 @@ class ThreadPoolTaskExecutorBuilderTests {
 	void customizersWhenCustomizersAreNullShouldThrowException() {
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> this.builder.customizers((ThreadPoolTaskExecutorCustomizer[]) null))
-			.withMessageContaining("Customizers must not be null");
+			.withMessageContaining("'customizers' must not be null");
 	}
 
 	@Test
 	void customizersCollectionWhenCustomizersAreNullShouldThrowException() {
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> this.builder.customizers((Set<ThreadPoolTaskExecutorCustomizer>) null))
-			.withMessageContaining("Customizers must not be null");
+			.withMessageContaining("'customizers' must not be null");
 	}
 
 	@Test
@@ -145,14 +152,14 @@ class ThreadPoolTaskExecutorBuilderTests {
 	void additionalCustomizersWhenCustomizersAreNullShouldThrowException() {
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> this.builder.additionalCustomizers((ThreadPoolTaskExecutorCustomizer[]) null))
-			.withMessageContaining("Customizers must not be null");
+			.withMessageContaining("'customizers' must not be null");
 	}
 
 	@Test
 	void additionalCustomizersCollectionWhenCustomizersAreNullShouldThrowException() {
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> this.builder.additionalCustomizers((Set<ThreadPoolTaskExecutorCustomizer>) null))
-			.withMessageContaining("Customizers must not be null");
+			.withMessageContaining("'customizers' must not be null");
 	}
 
 	@Test

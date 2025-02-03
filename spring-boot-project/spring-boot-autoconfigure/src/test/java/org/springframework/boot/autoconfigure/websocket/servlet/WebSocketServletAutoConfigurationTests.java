@@ -30,24 +30,26 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.websocket.DeploymentException;
 import jakarta.websocket.server.ServerContainer;
 import jakarta.websocket.server.ServerEndpoint;
-import org.eclipse.jetty.websocket.servlet.WebSocketUpgradeFilter;
+import org.eclipse.jetty.ee10.websocket.servlet.WebSocketUpgradeFilter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.web.servlet.DispatcherServletAutoConfiguration;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.testsupport.classpath.ForkedClassPath;
 import org.springframework.boot.testsupport.web.servlet.DirtiesUrlFactories;
-import org.springframework.boot.testsupport.web.servlet.Servlet5ClassPathOverrides;
 import org.springframework.boot.web.embedded.jetty.JettyServletWebServerFactory;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.boot.web.server.WebServerFactoryCustomizerBeanPostProcessor;
+import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.boot.web.servlet.ServletContextInitializer;
 import org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext;
 import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
@@ -104,32 +106,49 @@ class WebSocketServletAutoConfigurationTests {
 	}
 
 	@Test
-	@SuppressWarnings("rawtypes")
-	void whenCustomUpgradeFilterRegistrationIsDefinedAutoConfiguredRegistrationOfJettyUpgradeFilterBacksOff() {
-		new WebApplicationContextRunner()
-			.withConfiguration(AutoConfigurations.of(JettyConfiguration.class,
-					WebSocketServletAutoConfiguration.JettyWebSocketConfiguration.class))
-			.withUserConfiguration(CustomUpgradeFilterRegistrationConfiguration.class)
-			.run((context) -> {
-				Map<String, FilterRegistrationBean> filterRegistrations = context
-					.getBeansOfType(FilterRegistrationBean.class);
-				assertThat(filterRegistrations).containsOnlyKeys("unauthorizedFilter",
-						"customUpgradeFilterRegistration");
-			});
+	void jettyWebSocketUpgradeFilterIsAddedToServletContextOfJettyServer() {
+		try (AnnotationConfigServletWebServerApplicationContext context = new AnnotationConfigServletWebServerApplicationContext(
+				JettyConfiguration.class, WebSocketServletAutoConfiguration.JettyWebSocketConfiguration.class)) {
+			assertThat(context.getServletContext().getFilterRegistration(WebSocketUpgradeFilter.class.getName()))
+				.isNotNull();
+		}
+	}
+
+	@Test
+	void jettyWebSocketUpgradeFilterIsNotAddedToServletContextOfTomcatServer() {
+		try (AnnotationConfigServletWebServerApplicationContext context = new AnnotationConfigServletWebServerApplicationContext(
+				TomcatConfiguration.class, WebSocketServletAutoConfiguration.JettyWebSocketConfiguration.class)) {
+			assertThat(context.getServletContext().getFilterRegistration(WebSocketUpgradeFilter.class.getName()))
+				.isNull();
+		}
 	}
 
 	@Test
 	@SuppressWarnings("rawtypes")
-	void whenCustomUpgradeFilterIsDefinedAutoConfiguredRegistrationOfJettyUpgradeFilterBacksOff() {
+	void jettyWebSocketUpgradeFilterIsNotExposedAsABean() {
 		new WebApplicationContextRunner()
 			.withConfiguration(AutoConfigurations.of(JettyConfiguration.class,
 					WebSocketServletAutoConfiguration.JettyWebSocketConfiguration.class))
-			.withUserConfiguration(CustomUpgradeFilterConfiguration.class)
 			.run((context) -> {
-				Map<String, FilterRegistrationBean> filterRegistrations = context
-					.getBeansOfType(FilterRegistrationBean.class);
-				assertThat(filterRegistrations).containsOnlyKeys("unauthorizedFilter");
+				Map<String, Filter> filters = context.getBeansOfType(Filter.class);
+				assertThat(filters.values()).noneMatch(WebSocketUpgradeFilter.class::isInstance);
+				Map<String, AbstractFilterRegistrationBean> filterRegistrations = context
+					.getBeansOfType(AbstractFilterRegistrationBean.class);
+				assertThat(filterRegistrations.values()).extracting(AbstractFilterRegistrationBean::getFilter)
+					.noneMatch(WebSocketUpgradeFilter.class::isInstance);
 			});
+	}
+
+	@Test
+	void jettyWebSocketUpgradeFilterServletContextInitializerBacksOffWhenBeanWithSameNameIsDefined() {
+		try (AnnotationConfigServletWebServerApplicationContext context = new AnnotationConfigServletWebServerApplicationContext(
+				JettyConfiguration.class, CustomWebSocketUpgradeFilterServletContextInitializerConfiguration.class,
+				WebSocketServletAutoConfiguration.JettyWebSocketConfiguration.class)) {
+			BeanDefinition definition = context.getBeanFactory()
+				.getBeanDefinition("websocketUpgradeFilterServletContextInitializer");
+			assertThat(definition.getFactoryBeanName())
+				.contains("CustomWebSocketUpgradeFilterServletContextInitializerConfiguration");
+		}
 	}
 
 	static Stream<Arguments> testConfiguration() {
@@ -182,7 +201,6 @@ class WebSocketServletAutoConfigurationTests {
 
 	}
 
-	@Servlet5ClassPathOverrides
 	@Configuration(proxyBeanMethods = false)
 	static class JettyConfiguration extends CommonConfiguration {
 
@@ -196,23 +214,13 @@ class WebSocketServletAutoConfigurationTests {
 	}
 
 	@Configuration(proxyBeanMethods = false)
-	static class CustomUpgradeFilterRegistrationConfiguration {
+	static class CustomWebSocketUpgradeFilterServletContextInitializerConfiguration {
 
 		@Bean
-		FilterRegistrationBean<WebSocketUpgradeFilter> customUpgradeFilterRegistration() {
-			FilterRegistrationBean<WebSocketUpgradeFilter> registration = new FilterRegistrationBean<>(
-					new WebSocketUpgradeFilter());
-			return registration;
-		}
+		ServletContextInitializer websocketUpgradeFilterServletContextInitializer() {
+			return (servletContext) -> {
 
-	}
-
-	@Configuration(proxyBeanMethods = false)
-	static class CustomUpgradeFilterConfiguration {
-
-		@Bean
-		WebSocketUpgradeFilter customUpgradeFilter() {
-			return new WebSocketUpgradeFilter();
+			};
 		}
 
 	}

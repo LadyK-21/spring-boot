@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@ package org.springframework.boot.actuate.autoconfigure.opentelemetry;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
-
-import io.opentelemetry.sdk.resources.Resource;
-import io.opentelemetry.sdk.resources.ResourceBuilder;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -31,7 +27,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @author Moritz Halbritter
  * @since 3.2.0
  */
-@ConfigurationProperties(prefix = "management.opentelemetry")
+@ConfigurationProperties("management.opentelemetry")
 public class OpenTelemetryProperties {
 
 	/**
@@ -45,14 +41,6 @@ public class OpenTelemetryProperties {
 
 	public void setResourceAttributes(Map<String, String> resourceAttributes) {
 		this.resourceAttributes = resourceAttributes;
-	}
-
-	Resource toResource() {
-		ResourceBuilder builder = Resource.builder();
-		for (Entry<String, String> entry : this.resourceAttributes.entrySet()) {
-			builder.put(entry.getKey(), entry.getValue());
-		}
-		return builder.build();
 	}
 
 }

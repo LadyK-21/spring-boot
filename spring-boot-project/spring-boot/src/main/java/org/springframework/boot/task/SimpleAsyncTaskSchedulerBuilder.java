@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@
 
 package org.springframework.boot.task;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.springframework.boot.context.properties.PropertyMapper;
+import org.springframework.core.task.TaskDecorator;
 import org.springframework.scheduling.concurrent.SimpleAsyncTaskScheduler;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
@@ -46,21 +48,25 @@ public class SimpleAsyncTaskSchedulerBuilder {
 
 	private final Boolean virtualThreads;
 
+	private final Duration taskTerminationTimeout;
+
+	private final TaskDecorator taskDecorator;
+
 	private final Set<SimpleAsyncTaskSchedulerCustomizer> customizers;
 
 	public SimpleAsyncTaskSchedulerBuilder() {
-		this.threadNamePrefix = null;
-		this.customizers = null;
-		this.concurrencyLimit = null;
-		this.virtualThreads = null;
+		this(null, null, null, null, null, null);
 	}
 
 	private SimpleAsyncTaskSchedulerBuilder(String threadNamePrefix, Integer concurrencyLimit, Boolean virtualThreads,
+			Duration taskTerminationTimeout, TaskDecorator taskDecorator,
 			Set<SimpleAsyncTaskSchedulerCustomizer> taskSchedulerCustomizers) {
 		this.threadNamePrefix = threadNamePrefix;
 		this.concurrencyLimit = concurrencyLimit;
 		this.virtualThreads = virtualThreads;
 		this.customizers = taskSchedulerCustomizers;
+		this.taskDecorator = taskDecorator;
+		this.taskTerminationTimeout = taskTerminationTimeout;
 	}
 
 	/**
@@ -70,7 +76,7 @@ public class SimpleAsyncTaskSchedulerBuilder {
 	 */
 	public SimpleAsyncTaskSchedulerBuilder threadNamePrefix(String threadNamePrefix) {
 		return new SimpleAsyncTaskSchedulerBuilder(threadNamePrefix, this.concurrencyLimit, this.virtualThreads,
-				this.customizers);
+				this.taskTerminationTimeout, this.taskDecorator, this.customizers);
 	}
 
 	/**
@@ -80,7 +86,7 @@ public class SimpleAsyncTaskSchedulerBuilder {
 	 */
 	public SimpleAsyncTaskSchedulerBuilder concurrencyLimit(Integer concurrencyLimit) {
 		return new SimpleAsyncTaskSchedulerBuilder(this.threadNamePrefix, concurrencyLimit, this.virtualThreads,
-				this.customizers);
+				this.taskTerminationTimeout, this.taskDecorator, this.customizers);
 	}
 
 	/**
@@ -90,69 +96,87 @@ public class SimpleAsyncTaskSchedulerBuilder {
 	 */
 	public SimpleAsyncTaskSchedulerBuilder virtualThreads(Boolean virtualThreads) {
 		return new SimpleAsyncTaskSchedulerBuilder(this.threadNamePrefix, this.concurrencyLimit, virtualThreads,
-				this.customizers);
+				this.taskTerminationTimeout, this.taskDecorator, this.customizers);
 	}
 
 	/**
-	 * Set the {@link SimpleAsyncTaskSchedulerCustomizer
-	 * threadPoolTaskSchedulerCustomizers} that should be applied to the
-	 * {@link SimpleAsyncTaskScheduler}. Customizers are applied in the order that they
-	 * were added after builder configuration has been applied. Setting this value will
-	 * replace any previously configured customizers.
+	 * Set the task termination timeout.
+	 * @param taskTerminationTimeout the task termination timeout
+	 * @return a new builder instance
+	 * @since 3.2.1
+	 */
+	public SimpleAsyncTaskSchedulerBuilder taskTerminationTimeout(Duration taskTerminationTimeout) {
+		return new SimpleAsyncTaskSchedulerBuilder(this.threadNamePrefix, this.concurrencyLimit, this.virtualThreads,
+				taskTerminationTimeout, this.taskDecorator, this.customizers);
+	}
+
+	/**
+	 * Set the task decorator to be used by the {@link SimpleAsyncTaskScheduler}.
+	 * @param taskDecorator the task decorator to set
+	 * @return a new builder instance
+	 * @since 3.5.0
+	 */
+	public SimpleAsyncTaskSchedulerBuilder taskDecorator(TaskDecorator taskDecorator) {
+		return new SimpleAsyncTaskSchedulerBuilder(this.threadNamePrefix, this.concurrencyLimit, this.virtualThreads,
+				this.taskTerminationTimeout, taskDecorator, this.customizers);
+	}
+
+	/**
+	 * Set the {@link SimpleAsyncTaskSchedulerCustomizer customizers} that should be
+	 * applied to the {@link SimpleAsyncTaskScheduler}. Customizers are applied in the
+	 * order that they were added after builder configuration has been applied. Setting
+	 * this value will replace any previously configured customizers.
 	 * @param customizers the customizers to set
 	 * @return a new builder instance
 	 * @see #additionalCustomizers(SimpleAsyncTaskSchedulerCustomizer...)
 	 */
 	public SimpleAsyncTaskSchedulerBuilder customizers(SimpleAsyncTaskSchedulerCustomizer... customizers) {
-		Assert.notNull(customizers, "Customizers must not be null");
+		Assert.notNull(customizers, "'customizers' must not be null");
 		return customizers(Arrays.asList(customizers));
 	}
 
 	/**
-	 * Set the {@link SimpleAsyncTaskSchedulerCustomizer
-	 * threadPoolTaskSchedulerCustomizers} that should be applied to the
-	 * {@link SimpleAsyncTaskScheduler}. Customizers are applied in the order that they
-	 * were added after builder configuration has been applied. Setting this value will
-	 * replace any previously configured customizers.
+	 * Set the {@link SimpleAsyncTaskSchedulerCustomizer customizers} that should be
+	 * applied to the {@link SimpleAsyncTaskScheduler}. Customizers are applied in the
+	 * order that they were added after builder configuration has been applied. Setting
+	 * this value will replace any previously configured customizers.
 	 * @param customizers the customizers to set
 	 * @return a new builder instance
-	 * @see #additionalCustomizers(SimpleAsyncTaskSchedulerCustomizer...)
+	 * @see #additionalCustomizers(Iterable)
 	 */
 	public SimpleAsyncTaskSchedulerBuilder customizers(
 			Iterable<? extends SimpleAsyncTaskSchedulerCustomizer> customizers) {
-		Assert.notNull(customizers, "Customizers must not be null");
+		Assert.notNull(customizers, "'customizers' must not be null");
 		return new SimpleAsyncTaskSchedulerBuilder(this.threadNamePrefix, this.concurrencyLimit, this.virtualThreads,
-				append(null, customizers));
+				this.taskTerminationTimeout, this.taskDecorator, append(null, customizers));
 	}
 
 	/**
-	 * Add {@link SimpleAsyncTaskSchedulerCustomizer threadPoolTaskSchedulerCustomizers}
-	 * that should be applied to the {@link SimpleAsyncTaskScheduler}. Customizers are
-	 * applied in the order that they were added after builder configuration has been
-	 * applied.
+	 * Add {@link SimpleAsyncTaskSchedulerCustomizer customizers} that should be applied
+	 * to the {@link SimpleAsyncTaskScheduler}. Customizers are applied in the order that
+	 * they were added after builder configuration has been applied.
 	 * @param customizers the customizers to add
 	 * @return a new builder instance
 	 * @see #customizers(SimpleAsyncTaskSchedulerCustomizer...)
 	 */
 	public SimpleAsyncTaskSchedulerBuilder additionalCustomizers(SimpleAsyncTaskSchedulerCustomizer... customizers) {
-		Assert.notNull(customizers, "Customizers must not be null");
+		Assert.notNull(customizers, "'customizers' must not be null");
 		return additionalCustomizers(Arrays.asList(customizers));
 	}
 
 	/**
-	 * Add {@link SimpleAsyncTaskSchedulerCustomizer threadPoolTaskSchedulerCustomizers}
-	 * that should be applied to the {@link SimpleAsyncTaskScheduler}. Customizers are
-	 * applied in the order that they were added after builder configuration has been
-	 * applied.
+	 * Add {@link SimpleAsyncTaskSchedulerCustomizer customizers} that should be applied
+	 * to the {@link SimpleAsyncTaskScheduler}. Customizers are applied in the order that
+	 * they were added after builder configuration has been applied.
 	 * @param customizers the customizers to add
 	 * @return a new builder instance
-	 * @see #customizers(SimpleAsyncTaskSchedulerCustomizer...)
+	 * @see #customizers(Iterable)
 	 */
 	public SimpleAsyncTaskSchedulerBuilder additionalCustomizers(
 			Iterable<? extends SimpleAsyncTaskSchedulerCustomizer> customizers) {
-		Assert.notNull(customizers, "Customizers must not be null");
+		Assert.notNull(customizers, "'customizers' must not be null");
 		return new SimpleAsyncTaskSchedulerBuilder(this.threadNamePrefix, this.concurrencyLimit, this.virtualThreads,
-				append(this.customizers, customizers));
+				this.taskTerminationTimeout, this.taskDecorator, append(this.customizers, customizers));
 	}
 
 	/**
@@ -178,6 +202,8 @@ public class SimpleAsyncTaskSchedulerBuilder {
 		map.from(this.threadNamePrefix).to(taskScheduler::setThreadNamePrefix);
 		map.from(this.concurrencyLimit).to(taskScheduler::setConcurrencyLimit);
 		map.from(this.virtualThreads).to(taskScheduler::setVirtualThreads);
+		map.from(this.taskTerminationTimeout).as(Duration::toMillis).to(taskScheduler::setTaskTerminationTimeout);
+		map.from(this.taskDecorator).to(taskScheduler::setTaskDecorator);
 		if (!CollectionUtils.isEmpty(this.customizers)) {
 			this.customizers.forEach((customizer) -> customizer.customize(taskScheduler));
 		}

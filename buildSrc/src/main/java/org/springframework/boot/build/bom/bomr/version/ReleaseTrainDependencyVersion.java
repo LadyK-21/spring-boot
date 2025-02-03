@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,23 +64,37 @@ final class ReleaseTrainDependencyVersion implements DependencyVersion {
 
 	@Override
 	public boolean isUpgrade(DependencyVersion candidate, boolean movingToSnapshots) {
-		if (!(candidate instanceof ReleaseTrainDependencyVersion)) {
-			return true;
+		if (candidate instanceof ReleaseTrainDependencyVersion candidateReleaseTrain) {
+			return isUpgrade(candidateReleaseTrain, movingToSnapshots);
 		}
-		ReleaseTrainDependencyVersion candidateReleaseTrain = (ReleaseTrainDependencyVersion) candidate;
-		int comparison = this.releaseTrain.compareTo(candidateReleaseTrain.releaseTrain);
+		return true;
+	}
+
+	private boolean isUpgrade(ReleaseTrainDependencyVersion candidate, boolean movingToSnapshots) {
+		int comparison = this.releaseTrain.compareTo(candidate.releaseTrain);
 		if (comparison != 0) {
 			return comparison < 0;
 		}
-		if (movingToSnapshots && !"BUILD-SNAPSHOT".equals(this.type)
-				&& "BUILD-SNAPSHOT".equals(candidateReleaseTrain.type)) {
+		if (movingToSnapshots && !isSnapshot() && candidate.isSnapshot()) {
 			return true;
 		}
-		comparison = this.type.compareTo(candidateReleaseTrain.type);
+		comparison = this.type.compareTo(candidate.type);
 		if (comparison != 0) {
 			return comparison < 0;
 		}
-		return Integer.compare(this.version, candidateReleaseTrain.version) < 0;
+		return Integer.compare(this.version, candidate.version) < 0;
+	}
+
+	private boolean isSnapshot() {
+		return "BUILD-SNAPSHOT".equals(this.type);
+	}
+
+	@Override
+	public boolean isSnapshotFor(DependencyVersion candidate) {
+		if (!isSnapshot() || !(candidate instanceof ReleaseTrainDependencyVersion candidateReleaseTrain)) {
+			return false;
+		}
+		return this.releaseTrain.equals(candidateReleaseTrain.releaseTrain);
 	}
 
 	@Override
@@ -115,10 +129,7 @@ final class ReleaseTrainDependencyVersion implements DependencyVersion {
 			return false;
 		}
 		ReleaseTrainDependencyVersion other = (ReleaseTrainDependencyVersion) obj;
-		if (!this.original.equals(other.original)) {
-			return false;
-		}
-		return true;
+		return this.original.equals(other.original);
 	}
 
 	@Override

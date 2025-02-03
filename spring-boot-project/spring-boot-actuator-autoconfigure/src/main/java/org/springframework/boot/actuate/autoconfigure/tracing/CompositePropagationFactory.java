@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@
 package org.springframework.boot.actuate.autoconfigure.tracing;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import brave.internal.propagation.StringPropagationAdapter;
 import brave.propagation.B3Propagation;
 import brave.propagation.Propagation;
 import brave.propagation.Propagation.Factory;
@@ -70,9 +70,8 @@ class CompositePropagationFactory extends Propagation.Factory {
 	}
 
 	@Override
-	@SuppressWarnings("deprecation")
-	public <K> Propagation<K> create(Propagation.KeyFactory<K> keyFactory) {
-		return StringPropagationAdapter.create(this.propagation, keyFactory);
+	public Propagation<String> get() {
+		return this.propagation;
 	}
 
 	@Override
@@ -85,8 +84,15 @@ class CompositePropagationFactory extends Propagation.Factory {
 	}
 
 	/**
-	 * Creates a new {@link CompositePropagationFactory}, which uses the given
-	 * {@code injectionTypes} for injection and {@code extractionTypes} for extraction.
+	 * Creates a new {@link CompositePropagationFactory} which doesn't do any propagation.
+	 * @return the {@link CompositePropagationFactory}
+	 */
+	static CompositePropagationFactory noop() {
+		return new CompositePropagationFactory(Collections.emptyList(), Collections.emptyList());
+	}
+
+	/**
+	 * Creates a new {@link CompositePropagationFactory}.
 	 * @param properties the propagation properties
 	 * @return the {@link CompositePropagationFactory}
 	 */
@@ -95,8 +101,7 @@ class CompositePropagationFactory extends Propagation.Factory {
 	}
 
 	/**
-	 * Creates a new {@link CompositePropagationFactory}, which uses the given
-	 * {@code injectionTypes} for injection and {@code extractionTypes} for extraction.
+	 * Creates a new {@link CompositePropagationFactory}.
 	 * @param properties the propagation properties
 	 * @param baggageManager the baggage manager to use, or {@code null}
 	 * @param localFields the local fields, or {@code null}
